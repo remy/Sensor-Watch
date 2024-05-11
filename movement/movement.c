@@ -95,6 +95,11 @@
 #define MOVEMENT_DEFAULT_LED_DURATION 1
 #endif
 
+// Default to alarm button to wake
+#ifndef MOVEMENT_DEFAULT_WAKE_BUTTON
+#define MOVEMENT_DEFAULT_WAKE_BUTTON BTN_ALARM
+#endif
+
 #if __EMSCRIPTEN__
 #include <emscripten.h>
 #endif
@@ -156,7 +161,7 @@ const char movement_valid_position_1_chars[] = " ABCDEFHlJLNORTtUX-='01378";
 void cb_mode_btn_interrupt(void);
 void cb_light_btn_interrupt(void);
 void cb_alarm_btn_interrupt(void);
-void cb_alarm_btn_extwake(void);
+void cb_btn_extwake(void);
 void cb_alarm_fired(void);
 void cb_fast_tick(void);
 void cb_tick(void);
@@ -431,7 +436,7 @@ void app_setup(void) {
         watch_rtc_register_alarm_callback(cb_alarm_fired, alarm_time, ALARM_MATCH_SS);
     }
     if (movement_state.le_mode_ticks != -1) {
-        watch_disable_extwake_interrupt(BTN_ALARM);
+        watch_disable_extwake_interrupt(MOVEMENT_DEFAULT_WAKE_BUTTON);
 
         watch_enable_external_interrupts();
         watch_register_interrupt_callback(BTN_MODE, cb_mode_btn_interrupt, INTERRUPT_TRIGGER_BOTH);
@@ -518,7 +523,7 @@ bool app_loop(void) {
     // if we have timed out of our low energy mode countdown, enter low energy mode.
     if (movement_state.le_mode_ticks == 0) {
         movement_state.le_mode_ticks = -1;
-        watch_register_extwake_callback(BTN_ALARM, cb_alarm_btn_extwake, true);
+        watch_register_extwake_callback(MOVEMENT_DEFAULT_WAKE_BUTTON, cb_btn_extwake, true);
         event.event_type = EVENT_NONE;
         event.subsecond = 0;
 
@@ -652,7 +657,7 @@ void cb_alarm_btn_interrupt(void) {
     event.event_type = _figure_out_button_event(pin_level, EVENT_ALARM_BUTTON_DOWN, &movement_state.alarm_down_timestamp);
 }
 
-void cb_alarm_btn_extwake(void) {
+void cb_btn_extwake(void) {
     // wake up!
     _movement_reset_inactivity_countdown();
 }

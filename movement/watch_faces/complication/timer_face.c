@@ -28,7 +28,7 @@
 #include "watch.h"
 #include "watch_utility.h"
 
-static const uint32_t _default_timer_values[] = {0x000200, 0x000500, 0x000A00, 0x001400, 0x002D02}; // default timers: 2 min, 5 min, 10 min, 20 min, 2 h 45 min
+static const uint32_t _default_timer_values[] = {0x050000, 0x000500, 0x000A00, 0x001400, 0x002D02}; // default timers: 2 min, 5 min, 10 min, 20 min, 2 h 45 min
 
 // sound sequence for a single beeping sequence
 static const int8_t _sound_seq_beep[] = {BUZZER_NOTE_C8, 3, BUZZER_NOTE_REST, 3, -2, 2, BUZZER_NOTE_C8, 5, BUZZER_NOTE_REST, 25, 0};
@@ -54,9 +54,9 @@ static void _start(timer_state_t *state, movement_settings_t *settings, bool wit
     if (state->mode == pausing)
         state->target_ts = state->now_ts + state->paused_left;
     else
-        state->target_ts = watch_utility_offset_timestamp(state->now_ts, 
-                                                          state->timers[state->current_timer].unit.hours, 
-                                                          state->timers[state->current_timer].unit.minutes, 
+        state->target_ts = watch_utility_offset_timestamp(state->now_ts,
+                                                          state->timers[state->current_timer].unit.hours,
+                                                          state->timers[state->current_timer].unit.minutes,
                                                           state->timers[state->current_timer].unit.seconds);
     watch_date_time target_dt = watch_utility_date_time_from_unix_time(state->target_ts, _get_tz_offset(settings));
     state->mode = running;
