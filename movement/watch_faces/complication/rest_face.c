@@ -52,7 +52,7 @@ static void _set_next_valid_timer(rest_state_t *state) {
     }
 }
 
-static void _reset_display(rest_state_t *state) {
+static void _reset_display() {
     watch_display_string("re", 0);
     watch_set_colon();
     watch_clear_indicator(WATCH_INDICATOR_BELL);
@@ -73,7 +73,7 @@ static bool _draw(rest_state_t *state) {
     }
 
     if (state->remaining_seconds == 0 && state->overrun == 0) {
-      // _reset_display(state);
+      // _reset_display();
       watch_set_indicator(WATCH_INDICATOR_BELL);
       sprintf(buf, "%2d%02d--", 0, 0);
       watch_display_string(buf, 4);
@@ -130,7 +130,7 @@ void rest_face_setup(movement_settings_t *settings, uint8_t watch_face_index, vo
 void rest_face_activate(movement_settings_t *settings, void *context) {
     (void) settings;
     rest_state_t *state = (rest_state_t *)context;
-    _reset_display(state);
+    _reset_display();
     _draw(state);
 }
 
@@ -174,7 +174,7 @@ bool rest_face_loop(movement_event_t event, movement_settings_t *settings, void 
             }
             break;
         case EVENT_ALARM_BUTTON_UP:
-            _reset_display(state);
+            _reset_display();
             _start(state);
             _draw(state);
             break;
@@ -182,7 +182,7 @@ bool rest_face_loop(movement_event_t event, movement_settings_t *settings, void 
             if (state->mode == rest_running) {
               watch_set_led_off();
               state->mode = rest_idle;
-              _reset_display(state);
+              _reset_display();
               _draw(state);
               break;
             }

@@ -28,15 +28,15 @@
 #include "movement_faces.h"
 
 const watch_face_t watch_faces[] = {
-    // remy_clock_face,
-    simple_clock_face,
+    remy_clock_face,
+    // simple_clock_face,
     // clock_face,
-    // rest_face,
+    rest_face,
     // world_clock_face,
     sunrise_sunset_face,
     moon_phase_face,
     stopwatch_face,
-    // timer_face,
+    timer_face,
     preferences_face,
     set_time_face,
     thermistor_readout_face,
@@ -75,7 +75,7 @@ const watch_face_t watch_faces[] = {
  * 2: 5 minutes
  * 3: 30 minutes
  */
-#define MOVEMENT_DEFAULT_TIMEOUT_INTERVAL 0
+#define MOVEMENT_DEFAULT_TIMEOUT_INTERVAL 2
 
 /* Set the timeout before switching to low energy mode
  * Valid values are:
