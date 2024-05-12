@@ -28,15 +28,17 @@
 #include "movement_faces.h"
 
 const watch_face_t watch_faces[] = {
-    remy_clock_face,
-    timer_face,
-    rest_face,
+    // remy_clock_face,
+    simple_clock_face,
+    // clock_face,
+    // rest_face,
     // world_clock_face,
-    // sunrise_sunset_face,
-    // moon_phase_face,
-    // stopwatch_face,
-    // preferences_face,
-    // set_time_face,
+    sunrise_sunset_face,
+    moon_phase_face,
+    stopwatch_face,
+    // timer_face,
+    preferences_face,
+    set_time_face,
     thermistor_readout_face,
     voltage_face
 };

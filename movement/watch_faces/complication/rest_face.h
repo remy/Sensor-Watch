@@ -41,14 +41,14 @@ typedef enum {
     rest_reset
 } rest_mode_t;
 
+#define REST_SLOTS 9
 
 typedef struct {
-    // Anything you need to keep track of, put it here!
-    watch_date_time start_ts;
-    uint8_t remaining_seconds;
+    uint8_t current;
     uint32_t overrun;
-    uint8_t timer;
+    uint16_t remaining_seconds;
     rest_mode_t mode;
+    uint16_t timers[REST_SLOTS];
 } rest_state_t;
 
 void rest_face_setup(movement_settings_t *settings, uint8_t watch_face_index, void ** context_ptr);

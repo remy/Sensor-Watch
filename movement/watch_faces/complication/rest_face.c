@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2024 Remy Sharp
+ * Copyright (c) 2024 <#author_name#>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -28,10 +28,9 @@
 #include "watch.h"
 #include "watch_utility.h"
 
-#define DEFAULT_REST_TIMER 5
-
+static const uint16_t _defaults[] = {30, 60, 120}; // default timers: 30 seconds, 60, 120
 static const int8_t _sound_seq_beep[] = {BUZZER_NOTE_C8, 3, BUZZER_NOTE_REST, 3, -2, 2, BUZZER_NOTE_C8, 5, BUZZER_NOTE_REST, 35, 0};
-static const int8_t _sound_seq_start[] = {BUZZER_NOTE_C8, 2, 0};
+
 static uint8_t _beeps_to_play;    // temporary counter for ring signals playing
 // pinched wholesale from timer_face
 static void _signal_callback() {
@@ -42,123 +41,157 @@ static void _signal_callback() {
 }
 
 
+static void _set_next_valid_timer(rest_state_t *state) {
+    state->current = (state->current + 1) % REST_SLOTS;
+    if ((state->timers[state->current] & 0xFFFFFF) == 0) {
+        uint8_t i = state->current;
+        do {
+            i = (i + 1) % REST_SLOTS;
+        } while ((state->timers[i] & 0xFFFFFF) == 0 && i != state->current);
+        state->current = i;
+    }
+}
+
+static void _reset_display(rest_state_t *state) {
+    watch_display_string("re", 0);
+    watch_set_colon();
+    watch_clear_indicator(WATCH_INDICATOR_BELL);
+    watch_display_string("        ", 4);
+}
+
+static bool _draw(rest_state_t *state) {
+    char buf[16];
+    watch_duration_t duration;
+
+    watch_display_string("re", 0);
+
+    if (state->mode == rest_idle) {
+      duration = watch_utility_seconds_to_duration(state->timers[state->current]);
+      sprintf(buf, "%2d%02d", duration.minutes, duration.seconds);
+      watch_display_string(buf, 4);
+      return false;
+    }
+
+    if (state->remaining_seconds == 0 && state->overrun == 0) {
+      // _reset_display(state);
+      watch_set_indicator(WATCH_INDICATOR_BELL);
+      sprintf(buf, "%2d%02d--", 0, 0);
+      watch_display_string(buf, 4);
+      _beeps_to_play = 2; // more beeps
+      watch_buzzer_play_sequence((int8_t *)_sound_seq_beep, _signal_callback);
+      return false;
+    }
+
+    if (state->remaining_seconds > 0) {
+      watch_duration_t duration = watch_utility_seconds_to_duration(state->remaining_seconds);
+      sprintf(buf, "%2d%02d", duration.minutes, duration.seconds);
+      watch_display_string(buf, 4);
+      return false;
+    }
+
+    if (state->overrun > 0) {
+      watch_duration_t duration = watch_utility_seconds_to_duration(state->overrun);
+      if (duration.minutes == 9 && duration.seconds == 59) {
+        state->mode = rest_idle; // stop the timer entirely after 10 minutes
+        sprintf(buf, "------");
+        watch_display_string(buf, 4);
+        watch_clear_colon();
+        return true; // let the watch go to sleep
+      } else {
+        sprintf(buf, "%2d%02d", duration.minutes, duration.seconds);
+        watch_display_string(buf, 4);
+      }
+    }
+
+    return false;
+}
+
+static void _start(rest_state_t *state) {
+    state->mode = rest_running;
+    state->remaining_seconds = state->timers[state->current];
+    state->overrun = 0;
+}
+
+
 void rest_face_setup(movement_settings_t *settings, uint8_t watch_face_index, void ** context_ptr) {
     (void) settings;
     (void) watch_face_index;
     if (*context_ptr == NULL) {
         *context_ptr = malloc(sizeof(rest_state_t));
         memset(*context_ptr, 0, sizeof(rest_state_t));
-
-        rest_state_t *state = (rest_state_t *)context_ptr;
-
-        // Initialize your watch face here.
-        state->mode = rest_idle;
-        state->timer = DEFAULT_REST_TIMER;
-        state->remaining_seconds = DEFAULT_REST_TIMER;
+        rest_state_t *state = (rest_state_t *)*context_ptr;
+        state->current = 0;
+        for (uint8_t i = 0; i < sizeof(_defaults) / sizeof(_defaults[0]); i++) {
+            state->timers[i] = _defaults[i];
+        }
     }
-    // Do any pin or peripheral setup here; this will be called whenever the watch wakes from deep sleep.
 }
 
 void rest_face_activate(movement_settings_t *settings, void *context) {
     (void) settings;
     rest_state_t *state = (rest_state_t *)context;
-    state->remaining_seconds = DEFAULT_REST_TIMER;
+    _reset_display(state);
+    _draw(state);
 }
 
 bool rest_face_loop(movement_event_t event, movement_settings_t *settings, void *context) {
     rest_state_t *state = (rest_state_t *)context;
-    char buf[16];
 
     switch (event.event_type) {
         case EVENT_ACTIVATE:
-            sprintf(buf, "%2d", state->remaining_seconds);
-            watch_display_string(buf, 6);
             // Show your initial UI here.
+            _draw(state);
             break;
         case EVENT_TICK:
             // If needed, update your display here.
             if (state->mode == rest_running) {
-
-              if (state->remaining_seconds == 0 && state->overrun == 0) {
-                watch_clear_display();
-                watch_set_indicator(WATCH_INDICATOR_BELL);
-                watch_set_colon();
-                watch_display_string("--", 8);
-
-                // trigger the LED to flash & the buzzer to sound
-                _beeps_to_play = 2; // more beeps
-                watch_buzzer_play_sequence((int8_t *)_sound_seq_beep, _signal_callback);
-              }
-
               if (state->remaining_seconds > 0) {
                 state->remaining_seconds--;
-                sprintf(buf, "%2d", state->remaining_seconds);
-                watch_display_string(buf, 6);
+                if (state->remaining_seconds == 0) {
+                  watch_set_led_green();
+                }
               } else {
-                if (state->overrun < 4) {
-                  if (state->overrun % 2 == 0) {
+                if (state->overrun < 3) {
+                  if (state->overrun % 2 == 1) {
                     watch_set_led_green();
                   } else {
                     watch_set_led_off();
                   }
                 }
-                state->overrun++;
-                watch_duration_t duration = watch_utility_seconds_to_duration(state->overrun);
-                sprintf(buf, "%2d%02d", duration.minutes, duration.seconds);
-                watch_display_string(buf, 4);
 
-                // automatically move to idle if we've overrun by an hour
-                if (duration.minutes == 59 && duration.seconds == 59) {
-                  sprintf(buf, "------");
-                  watch_display_string(buf, 4);
-                  watch_clear_colon();
-                  state->mode = rest_idle;
-                  return true;
-                }
+                state->overrun++;
               }
+              _draw(state);
             }
             break;
         case EVENT_LIGHT_BUTTON_UP:
             // You can use the Light button for your own purposes. Note that by default, Movement will also
             // illuminate the LED in response to EVENT_LIGHT_BUTTON_DOWN; to suppress that behavior, add an
             // empty case for EVENT_LIGHT_BUTTON_DOWN.
+            if (state->mode == rest_idle) {
+              _set_next_valid_timer(state);
+              _draw(state);
+            }
             break;
         case EVENT_ALARM_BUTTON_UP:
-            watch_set_led_off();
-            watch_clear_display();
-            state->mode = rest_running;
-            state->start_ts = watch_rtc_get_date_time();
-            state->remaining_seconds = DEFAULT_REST_TIMER;
-            state->overrun = 0;
-            sprintf(buf, "%2d", state->remaining_seconds);
-            watch_display_string(buf, 6);
-            printf("Starting timer: %d\r\n", state->remaining_seconds);
-
-              // this gives a little more time between press and actually counting down
-            state->remaining_seconds++;
-
+            _reset_display(state);
+            _start(state);
+            _draw(state);
             break;
         case EVENT_MODE_BUTTON_UP:
             if (state->mode == rest_running) {
               watch_set_led_off();
-              watch_clear_display();
               state->mode = rest_idle;
-              state->remaining_seconds = DEFAULT_REST_TIMER;
-              sprintf(buf, "%2d", state->remaining_seconds);
-              watch_display_string(buf, 6);
+              _reset_display(state);
+              _draw(state);
               break;
             }
-        case EVENT_MODE_LONG_PRESS:
-            movement_move_to_face(0);
+            movement_move_to_next_face();
             break;
         case EVENT_TIMEOUT:
-            if (state->mode == rest_idle) {
-              movement_move_to_face(0);
-            }
-            break;
             // Your watch face will receive this event after a period of inactivity. If it makes sense to resign,
             // you may uncomment this line to move back to the first watch face in the list:
-            // movement_move_to_face(0);
+            movement_move_to_face(0);
             break;
         case EVENT_LOW_ENERGY_UPDATE:
             // If you did not resign in EVENT_TIMEOUT, you can use this event to update the display once a minute.
